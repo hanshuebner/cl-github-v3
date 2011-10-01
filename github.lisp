@@ -20,7 +20,7 @@
                      (error-response c)))))
 
 (defun keyword-to-github-keyword (keyword)
-  (substitute #\_ #\- (string keyword)))
+  (string-downcase (substitute #\_ #\- (string keyword))))
 
 (defun github-keyword-to-keyword (string)
   (intern (substitute #\- #\_ string) :keyword))
