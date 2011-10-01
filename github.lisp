@@ -23,7 +23,8 @@
   (string-downcase (substitute #\_ #\- (string keyword))))
 
 (defun github-keyword-to-keyword (string)
-  (intern (substitute #\- #\_ string) :keyword))
+  (let ((*package* (find-package :keyword)))
+    (read-from-string (substitute #\- #\_ string))))
 
 (defun plist-to-http-parameters (plist)
   (loop
@@ -77,8 +78,8 @@
   ;; unhygienic
   `(prog1
        (defun ,name (&rest parameters &key ,@parameters)
-         (declare (ignorable ,@(loop for parameter in parameters
-                                  collect (if (listp parameter) (first parameter) parameter))))
+         (declare (ignorable parameters ,@(loop for parameter in parameters
+                                             collect (if (listp parameter) (first parameter) parameter))))
          ,@body)
      (export ',name)))
 
