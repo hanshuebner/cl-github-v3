@@ -39,14 +39,12 @@
      finally (return hash-table)))
 
 (defun api-command (url &key body (method :get) (username *username*) (password *password*) parameters)
-  (assert (and (stringp username) (stringp password)) ()
-          "Username and password strings must be supplied")
   (multiple-value-bind
         (body status-code headers)
       (drakma:http-request (format nil "https://api.github.com~A" url)
                            :method method
                            :parameters (plist-to-http-parameters parameters)
-                           :basic-authorization (list username password)
+                           :basic-authorization (when username (list username password))
                            :content-type "application/json"
                            :content (when body
                                       (with-output-to-string (s)
