@@ -1,3 +1,12 @@
+(defpackage :cl-github
+  (:nicknames :github)
+  (:use #:cl)
+  (:export #:*username*
+           #:*password*
+           #:api-command
+           #:create-repository
+           #:list-repositories))
+
 (in-package #:cl-github)
 
 (defvar *username* nil

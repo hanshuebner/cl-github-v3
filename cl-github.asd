@@ -1,5 +1,9 @@
 (defsystem :cl-github
   :serial t
-  :depends-on (:drakma :yason :alexandria)
-  :components ((:file "packages")
-               (:file "github")))
+  :version "0.0.1"
+  :description "github V3 API library"
+  :author "Hans Huebner"
+  :depends-on (:drakma
+               :yason
+               :alexandria)
+  :components ((:file "github")))
