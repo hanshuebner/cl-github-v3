@@ -69,6 +69,9 @@
                  :http-headers headers
                  :response response)))))
 
+(defun rel-path (format-str &rest args)
+  (apply 'format nil format-str args))
+
 (defmacro booleanize-parameters (plist &rest keys)
   ;; unhygienic
   `(setf ,plist (let (result)
@@ -81,21 +84,13 @@
                               value)
                           result)))))
 
-(defmacro define-github-command (name parameters &body body)
+;; TODO: We are rate-limited to 5000/reqs an hour or a little over 83 a minute. How to best comply?
+(defmacro define-github-command (name parameters (&key docs) &body body)
   ;; unhygienic
   `(prog1
        (defun ,name (&rest parameters &key ,@parameters)
+         ,@(when docs (list docs))
          (declare (ignorable parameters ,@(loop for parameter in parameters
                                              collect (if (listp parameter) (first parameter) parameter))))
          ,@body)
      (export ',name)))
-
-(define-github-command create-repository (name org description homepage public has-issues has-wiki has-downloads)
-  (booleanize-parameters parameters :has-issues :has-wiki :has-downloads)
-  (api-command (if org (format nil "/orgs/~A/repos" org) "/user/repos")
-               :method :post
-               :body parameters))
-
-(define-github-command list-repositories (org)
-  (api-command (if org (format nil "/orgs/~A/repos" org) "/user/repos")
-               :method :get))
