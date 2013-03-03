@@ -9,3 +9,7 @@ Tackle repo sub-APIs
 Make create-gist not need pre-constructed files plist/arg
 edit
 Tackle gist comments sub-API
+
+;; Search commands
+handle search-emails?
+

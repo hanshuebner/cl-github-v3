@@ -7,4 +7,5 @@
                :yason
                :alexandria)
   :components ((:file "github")
-               (:file "repos")))
+               (:file "repos")
+               (:file "gists")))
