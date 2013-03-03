@@ -6,4 +6,5 @@
   :depends-on (:drakma
                :yason
                :alexandria)
-  :components ((:file "github")))
+  :components ((:file "github")
+               (:file "repos")))

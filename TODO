@@ -3,4 +3,9 @@ Improve docs.
 
 ;; Repo commands
 list-all, edit
+Tackle repo sub-APIs
 
+;; Gist commands
+Make create-gist not need pre-constructed files plist/arg
+edit
+Tackle gist comments sub-API
