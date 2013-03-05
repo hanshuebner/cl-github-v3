@@ -3,9 +3,9 @@
   (:use #:cl)
   (:export #:*username*
            #:*password*
+           #:define-github-command
            #:api-command
-           #:create-repository
-           #:list-repositories))
+           #:booleanize-parameters))
 
 (in-package #:cl-github)
 

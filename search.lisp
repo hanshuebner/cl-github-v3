@@ -1,4 +1,10 @@
-(in-package #:cl-github)
+(defpackage #:github-search
+  (:use :cl)
+  (:import-from :cl-github #:define-github-command
+                           #:api-command
+                           #:rel-path))
+
+(in-package #:github-search)
 
 (define-github-command search-issues (owner repo state keyword)
     (:docs "Search for issues on OWNER's REPO. STATE should be 'open' or 'closed'.
