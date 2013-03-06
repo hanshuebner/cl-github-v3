@@ -13,3 +13,6 @@ Tackle gist comments sub-API
 ;; Search commands
 handle search-emails?
 
+;; User commands
+edit
+email, pubkey, followers sub-APIs

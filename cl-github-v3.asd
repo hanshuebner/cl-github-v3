@@ -8,4 +8,6 @@
                :alexandria)
   :components ((:file "github")
                (:file "repos")
-               (:file "gists")))
+               (:file "gists")
+               (:file "search")
+               (:file "users")))
