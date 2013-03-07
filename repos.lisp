@@ -54,3 +54,19 @@ repositories for the authenticated user.")
 (define-github-command get-branch (owner repo branch)
     (:docs "Get metadata about BRANCH from OWNER's REPO.")
   (api-command (rel-path "/repos/~A/~A/branches/~A" owner repo branch) :method :get))
+
+;; Repo Contents API
+
+(define-github-command get-readme (owner repo)
+    (:docs "Get the README file for OWNER's REPO.")
+  (api-command (rel-path "/repos/~A/~A/readme" owner repo) :method :get))
+
+(define-github-command get-content (owner repo path)
+    (:docs "Get the file at PATH from OWNER's REPO.")
+  (api-command (rel-path "/repos/~A/~A/contents/~A" owner repo path) :method :get))
+
+(define-github-command get-archive (owner repo (format "tarball"))
+    (:docs "Get an archive of OWNER's REPO in the given FORMAT.
+FORMAT should be zipball or tarball and defaults to tarball.")
+  (api-command (rel-path "/repos/~A/~A/~A" owner repo format) :method :get))
+

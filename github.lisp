@@ -47,6 +47,12 @@
      do (setf (gethash (keyword-to-github-keyword key) hash-table) value)
      finally (return hash-table)))
 
+(defun parse-body (body headers)
+  (multiple-value-bind (main-ct sub-ct params) (drakma:get-content-type headers)
+    (cond ((string= "json" sub-ct)
+           (yason:parse (flex:octets-to-string body :external-format :utf-8)))
+          ((string= "application" main-ct) body))))
+
 (defun api-command (url &key body (method :get) (username *username*) (password *password*) parameters)
   (multiple-value-bind
         (body status-code headers)
@@ -60,8 +66,7 @@
                                         (yason:encode (plist-to-hash-table body) s))))
     (let* ((yason:*parse-object-as* :plist)
            (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
-           (response (when body
-                       (yason:parse (flex:octets-to-string body :external-format :utf-8)))))
+           (response (when body (parse-body body headers))))
       (if (< status-code 300)
           (values response headers)
           (error 'api-error
