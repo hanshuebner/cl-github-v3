@@ -17,8 +17,8 @@
 (define-github-command create-gist (description public files)
     (:docs "Create a new gist containing CONTENT with privacy based on PUBLIC.
 FILES should be a plist of filename keys containing a '(:content 'content-str').")
-  (cl-github:booleanize-parameters parameters :public)
-  (api-command "/gists" :method :post :body parameters))
+  (cl-github:booleanize-parameters github::parameters :public)
+  (api-command "/gists" :method :post :body github::parameters))
 
 (define-github-command star-gist (id)
     (:docs "Star the gist with the given ID.")

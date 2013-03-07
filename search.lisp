@@ -18,10 +18,10 @@ NOTE: This is a legacy API call.")
 only return repos written in the given language. If PAGE is provided, return
 the given PAGE of results. NOTE: This is a legacy API call.")
   (api-command (rel-path "/legacy/repos/search/~A" keyword) :method :get
-               :body parameters))
+               :body github::parameters))
 
 (define-github-command search-users (keyword page)
     (:docs "Search for users matching KEYWORD. If PAGE is provided, return the
 given PAGE of results. NOTE: This is a legacy API call.")
   (api-command (rel-path "/legacy/users/search/~A" keyword) :method :get
-               :body parameters))
+               :body github::parameters))

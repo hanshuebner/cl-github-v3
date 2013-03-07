@@ -10,10 +10,10 @@
                                           has-issues has-wiki has-downloads)
     (:docs "Create a new repo, NAME, for the authenticated user. If ORG is provided,
 creates a new repo for the given ORGANIZATION.")
-  (cl-github:booleanize-parameters parameters :has-issues :has-wiki :has-downloads)
+  (cl-github:booleanize-parameters github::parameters :has-issues :has-wiki :has-downloads)
   (api-command (if org (rel-path "/orgs/~A/repos" org) "/user/repos")
                :method :post
-               :body parameters))
+               :body github::parameters))
 
 (define-github-command list-repositories (org user)
     (:docs "List repositories for the given ORG or USER. If neither is given, list
