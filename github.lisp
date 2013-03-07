@@ -3,9 +3,9 @@
   (:use #:cl)
   (:export #:*username*
            #:*password*
+           #:define-github-command
            #:api-command
-           #:create-repository
-           #:list-repositories))
+           #:booleanize-parameters))
 
 (in-package #:cl-github)
 
@@ -47,6 +47,12 @@
      do (setf (gethash (keyword-to-github-keyword key) hash-table) value)
      finally (return hash-table)))
 
+(defun parse-body (body headers)
+  (multiple-value-bind (main-ct sub-ct params) (drakma:get-content-type headers)
+    (cond ((string= "json" sub-ct)
+           (yason:parse (flex:octets-to-string body :external-format :utf-8)))
+          ((string= "application" main-ct) body))))
+
 (defun api-command (url &key body (method :get) (username *username*) (password *password*) parameters)
   (multiple-value-bind
         (body status-code headers)
@@ -60,14 +66,16 @@
                                         (yason:encode (plist-to-hash-table body) s))))
     (let* ((yason:*parse-object-as* :plist)
            (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
-           (response (when body
-                       (yason:parse (flex:octets-to-string body :external-format :utf-8)))))
+           (response (when body (parse-body body headers))))
       (if (< status-code 300)
           (values response headers)
           (error 'api-error
                  :http-status status-code
                  :http-headers headers
                  :response response)))))
+
+(defun rel-path (format-str &rest args)
+  (apply 'format nil format-str args))
 
 (defmacro booleanize-parameters (plist &rest keys)
   ;; unhygienic
@@ -81,21 +89,13 @@
                               value)
                           result)))))
 
-(defmacro define-github-command (name parameters &body body)
+;; TODO: We are rate-limited to 5000/reqs an hour or a little over 83 a minute. How to best comply?
+(defmacro define-github-command (name parameters (&key docs) &body body)
   ;; unhygienic
   `(prog1
        (defun ,name (&rest parameters &key ,@parameters)
+         ,@(when docs (list docs))
          (declare (ignorable parameters ,@(loop for parameter in parameters
                                              collect (if (listp parameter) (first parameter) parameter))))
          ,@body)
      (export ',name)))
-
-(define-github-command create-repository (name org description homepage public has-issues has-wiki has-downloads)
-  (booleanize-parameters parameters :has-issues :has-wiki :has-downloads)
-  (api-command (if org (format nil "/orgs/~A/repos" org) "/user/repos")
-               :method :post
-               :body parameters))
-
-(define-github-command list-repositories (org)
-  (api-command (if org (format nil "/orgs/~A/repos" org) "/user/repos")
-               :method :get))
