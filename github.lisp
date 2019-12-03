@@ -96,6 +96,29 @@
                :method :post
                :body parameters))
 
+(defun do-header-links (fn headers)
+  (dolist (h headers)
+    (when (eq :link (car h))
+      (funcall fn (cdr h)))))
+
 (define-github-command list-repositories (org)
-  (api-command (if org (format nil "/orgs/~A/repos" org) "/user/repos")
-               :method :get))
+  (let ((url (if org
+                 (format nil "/orgs/~A/repos?per_page=100" org)
+                 "/user/repos?per_page=100"))
+        (repos nil))
+    (loop
+       (unless url
+         (return))
+       (multiple-value-bind (list headers)
+           (api-command url :method :get)
+         (setf repos (append list repos))
+         (setf url nil)
+         (do-header-links
+             (lambda (link)
+               (cl-ppcre:do-register-groups (next)
+                   ("<(?:https://[^/]+)(/[^<>]+)>; rel=\"next\""
+                    link)
+                 (format t "~&Following next link ~S~%" next)
+                 (setf url next)))
+           headers)))
+    repos))
