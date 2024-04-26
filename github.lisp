@@ -47,13 +47,17 @@
      do (setf (gethash (keyword-to-github-keyword key) hash-table) value)
      finally (return hash-table)))
 
+(defconstant +unix-epoch+ (encode-universal-time 0 0 0 1 1 1970 0)
+  "The Unix epoch as a universal time.")
+
+(defun get-unix-time ()
+  (- (get-universal-time) +unix-epoch+))
+
 (defun get-ratelimit-wait (headers)
   (let ((sleep-target (cdr (assoc :X-RATELIMIT-RESET headers))))
     (when sleep-target
-      (+ (- (parse-integer sleep-target)
-            (- (get-universal-time)
-               (encode-universal-time 0 0 0 1 1 1970 0)))
-         2))))
+      ;; Add 2 second buffer to accommodate minor clock differences
+      (+ (- (parse-integer sleep-target) (get-unix-time) 2)))))
 
 (defun api-command (url &key body (method :get) (username *username*) (password *password*) parameters)
   (tagbody
@@ -71,14 +75,15 @@
        (let* ((yason:*parse-object-as* :plist)
               (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
               (response (when body
-                          (yason:parse (flex:octets-to-string body :external-format :utf-8)))))
+                          (yason:parse (flex:octets-to-string body :external-format :utf-8))))
+              (ratelimit-wait (get-ratelimit-wait headers)))
          (cond
            ((< status-code 300)
             (values response headers))
-           ((and (= status-code 403) (get-ratelimit-wait headers))
+           ((and (= status-code 403) ratelimit-wait)
             (format t "~&Rate limited. Sleeping for ~A seconds.~%"
-                    (get-ratelimit-wait headers))
-            (sleep (get-ratelimit-wait headers))
+                    ratelimit-wait)
+            (sleep ratelimit-wait)
             (go :retry))
            (t (error 'api-error
                      :http-status status-code
