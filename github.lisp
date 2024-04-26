@@ -62,12 +62,27 @@
            (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
            (response (when body
                        (yason:parse (flex:octets-to-string body :external-format :utf-8)))))
-      (if (< status-code 300)
-          (values response headers)
-          (error 'api-error
-                 :http-status status-code
-                 :http-headers headers
-                 :response response)))))
+      (cond
+        ((< status-code 300)
+         (values response headers))
+        ((= status-code 403)
+         (let ((sleep-target (cdr (assoc :X-RATELIMIT-RESET headers))))
+           (if sleep-target
+               (let ((sleep-seconds (+ (- (parse-integer sleep-target)
+                                          (sb-posix:time))
+                                       2)))
+                 (format t "~&Rate limited. Sleeping for ~A seconds.~%" sleep-seconds)
+                 (sleep sleep-seconds)
+                 (api-command url :body body :method method :username username
+                                  :password password :parameters parameters))
+               (error 'api-error
+                      :http-status status-code
+                      :http-headers headers
+                      :response response))))
+        (t (error 'api-error
+                  :http-status status-code
+                  :http-headers headers
+                  :response response))))))
 
 (defmacro booleanize-parameters (plist &rest keys)
   ;; unhygienic
