@@ -47,42 +47,43 @@
      do (setf (gethash (keyword-to-github-keyword key) hash-table) value)
      finally (return hash-table)))
 
+(defun get-ratelimit-wait (headers)
+  (let ((sleep-target (cdr (assoc :X-RATELIMIT-RESET headers))))
+    (when sleep-target
+      (+ (- (parse-integer sleep-target)
+            (- (get-universal-time)
+               (encode-universal-time 0 0 0 1 1 1970 0)))
+         2))))
+
 (defun api-command (url &key body (method :get) (username *username*) (password *password*) parameters)
-  (multiple-value-bind
-        (body status-code headers)
-      (drakma:http-request (format nil "https://api.github.com~A" url)
-                           :method method
-                           :parameters (plist-to-http-parameters parameters)
-                           :basic-authorization (when username (list username password))
-                           :content-type "application/json"
-                           :content (when body
-                                      (with-output-to-string (s)
-                                        (yason:encode (plist-to-hash-table body) s))))
-    (let* ((yason:*parse-object-as* :plist)
-           (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
-           (response (when body
-                       (yason:parse (flex:octets-to-string body :external-format :utf-8)))))
-      (cond
-        ((< status-code 300)
-         (values response headers))
-        ((= status-code 403)
-         (let ((sleep-target (cdr (assoc :X-RATELIMIT-RESET headers))))
-           (if sleep-target
-               (let ((sleep-seconds (+ (- (parse-integer sleep-target)
-                                          (sb-posix:time))
-                                       2)))
-                 (format t "~&Rate limited. Sleeping for ~A seconds.~%" sleep-seconds)
-                 (sleep sleep-seconds)
-                 (api-command url :body body :method method :username username
-                                  :password password :parameters parameters))
-               (error 'api-error
-                      :http-status status-code
-                      :http-headers headers
-                      :response response))))
-        (t (error 'api-error
-                  :http-status status-code
-                  :http-headers headers
-                  :response response))))))
+  (tagbody
+     :retry
+     (multiple-value-bind
+           (body status-code headers)
+         (drakma:http-request (format nil "https://api.github.com~A" url)
+                              :method method
+                              :parameters (plist-to-http-parameters parameters)
+                              :basic-authorization (when username (list username password))
+                              :content-type "application/json"
+                              :content (when body
+                                         (with-output-to-string (s)
+                                           (yason:encode (plist-to-hash-table body) s))))
+       (let* ((yason:*parse-object-as* :plist)
+              (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
+              (response (when body
+                          (yason:parse (flex:octets-to-string body :external-format :utf-8)))))
+         (cond
+           ((< status-code 300)
+            (values response headers))
+           ((and (= status-code 403) (get-ratelimit-wait headers))
+            (format t "~&Rate limited. Sleeping for ~A seconds.~%"
+                    (get-ratelimit-wait headers))
+            (sleep (get-ratelimit-wait headers))
+            (go :retry))
+           (t (error 'api-error
+                     :http-status status-code
+                     :http-headers headers
+                     :response response)))))))
 
 (defmacro booleanize-parameters (plist &rest keys)
   ;; unhygienic
