@@ -81,8 +81,7 @@
            ((< status-code 300)
             (values response headers))
            ((and (= status-code 403) ratelimit-wait)
-            (format t "~&Rate limited. Sleeping for ~A seconds.~%"
-                    ratelimit-wait)
+            (format t "~&Rate limited. Sleeping for ~A seconds.~%" ratelimit-wait)
             (sleep ratelimit-wait)
             (go :retry))
            (t (error 'api-error
