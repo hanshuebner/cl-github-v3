@@ -9,6 +9,12 @@
 
 (in-package #:cl-github)
 
+(defparameter +ratelimit-retry-max+ 8
+  "Number of retries before failing")
+
+(defparameter +ratelimit-min-wait+ 2
+  "Minimum number of seconds to wait when rate limited")
+
 (defvar *username* nil
   "Username to use for API calls")
 
@@ -53,41 +59,60 @@
 (defun get-unix-time ()
   (- (get-universal-time) +unix-epoch+))
 
-(defun get-ratelimit-wait (headers)
-  (let ((sleep-target (cdr (assoc :X-RATELIMIT-RESET headers))))
-    (when sleep-target
-      ;; Add 2 second buffer to accommodate minor clock differences
-      (+ (- (parse-integer sleep-target) (get-unix-time) 2)))))
-
 (defun api-command (url &key body (method :get) (username *username*) (password *password*) parameters)
-  (tagbody
-     :retry
-     (multiple-value-bind
-           (body status-code headers)
-         (drakma:http-request (format nil "https://api.github.com~A" url)
-                              :method method
-                              :parameters (plist-to-http-parameters parameters)
-                              :basic-authorization (when username (list username password))
-                              :content-type "application/json"
-                              :content (when body
-                                         (with-output-to-string (s)
-                                           (yason:encode (plist-to-hash-table body) s))))
-       (let* ((yason:*parse-object-as* :plist)
-              (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
-              (response (when body
-                          (yason:parse (flex:octets-to-string body :external-format :utf-8))))
-              (ratelimit-wait (get-ratelimit-wait headers)))
-         (cond
-           ((< status-code 300)
-            (values response headers))
-           ((and (= status-code 403) ratelimit-wait)
-            (format t "~&Rate limited. Sleeping for ~A seconds.~%" ratelimit-wait)
-            (sleep ratelimit-wait)
-            (go :retry))
-           (t (error 'api-error
-                     :http-status status-code
-                     :http-headers headers
-                     :response response)))))))
+  (let ((ratelimit-retry-count 0)
+        (ratelimit-wait 0))
+
+    ;; Handle rate limit errors according to Github's best practices
+    ;; documentation:
+    ;; https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api?apiVersion=2022-11-28#handle-rate-limit-errors-appropriately
+
+    (flet ((get-ratelimit-wait (headers)
+             "Return the number of seconds to wait before retrying."
+             (let ((retry-after (cdr (assoc :RETRY-AFTER headers)))
+                   (ratelimit-reset (cdr (assoc :X-RATELIMIT-RESET headers))))
+               (max +ratelimit-min-wait+
+                    (cond
+                      (retry-after
+                       (parse-integer retry-after))
+                      (ratelimit-reset
+                       (- (parse-integer ratelimit-reset) (get-unix-time)))
+                      ((< ratelimit-retry-count +ratelimit-retry-max+)
+                       (incf ratelimit-retry-count)
+                       (setf ratelimit-wait (max 60 (* 2 ratelimit-wait))))
+                      (t (error 'api-error
+                                :http-status 403
+                                :http-headers headers
+                                :response "Github API rate limit retries exceeded")))))))
+
+      (tagbody
+       :retry
+         (multiple-value-bind
+               (body status-code headers)
+             (drakma:http-request (format nil "https://api.github.com~A" url)
+                                  :method method
+                                  :parameters (plist-to-http-parameters parameters)
+                                  :basic-authorization (when username (list username password))
+                                  :content-type "application/json"
+                                  :content (when body
+                                             (with-output-to-string (s)
+                                               (yason:encode (plist-to-hash-table body) s))))
+           (let* ((yason:*parse-object-as* :plist)
+                  (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
+                  (response (when body
+                              (yason:parse (flex:octets-to-string body :external-format :utf-8))))
+                  (ratelimit-wait (when (= status-code 403) (get-ratelimit-wait headers))))
+             (cond
+               ((< status-code 300)
+                (return-from api-command (values response headers)))
+               (ratelimit-wait
+                (format t "~&Github is rate limiting API calls. Sleeping for ~A seconds.~%" ratelimit-wait)
+                (sleep ratelimit-wait)
+                (go :retry))
+               (t (error 'api-error
+                         :http-status status-code
+                         :http-headers headers
+                         :response response)))))))))
 
 (defmacro booleanize-parameters (plist &rest keys)
   ;; unhygienic
