@@ -101,7 +101,11 @@
                   (yason:*parse-object-key-fn* 'github-keyword-to-keyword)
                   (response (when body
                               (yason:parse (flex:octets-to-string body :external-format :utf-8))))
-                  (ratelimit-wait (when (= status-code 403) (get-ratelimit-wait headers))))
+                  (ratelimit-remaining (cdr (assoc :X-RATELIMIT-REMAINING headers)))
+                  (ratelimit-wait (when (and (= status-code 403)
+                                             ratelimit-remaining
+                                             (string= ratelimit-remaining "0"))
+                                    (get-ratelimit-wait headers))))
              (cond
                ((< status-code 300)
                 (return-from api-command (values response headers)))
